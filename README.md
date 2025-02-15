@@ -302,26 +302,26 @@ A running log of things I'm learning to build strong core software engineering s
 |[Youtube: CMU Advanced NLP Fall 2024 (10): Retrieval and RAG](https://www.youtube.com/watch?v=KfQaYk4k9eM&list=PL8PYTP1V4I8D4BeyjwWczukWq9d8PNyZp&index=6) `1h17m`|✅|
 |[Guidance: Token Healing](https://github.com/guidance-ai/guidance/blob/main/notebooks/tutorials/token_healing.ipynb)|⬜|
 
-#### Agentic Pattern
+#### Agentic Pattern (current learning 15/02/25)
 
 |Resource|Progress|
 |---|---|
 |[Article: Tool Invocation - Demonstrating the Marvel of GPT's Flexibility](https://blog.jnbrymn.com/2024/01/30/the-marvel-of-GPT-generality.html)|⬜|
-|[Anthropic: Building effective agents](https://www.anthropic.com/research/building-effective-agents)|✅|
-|[Anthropic: Building Effective Agents Cookbook](https://github.com/anthropics/anthropic-cookbook/tree/main/patterns/agents)|✅|
-|[OpenAI: Assistants & Agents Build Hour](https://vimeo.com/showcase/11333741/video/990334325)|✅|
-|[OpenAI: Function Calling Build Hour](https://vimeo.com/showcase/11333741/video/952127114)|✅|
+|[Anthropic: Building effective agents](https://www.anthropic.com/research/building-effective-agents)|⬜|
+|[Anthropic: Building Effective Agents Cookbook](https://github.com/anthropics/anthropic-cookbook/tree/main/patterns/agents)|⬜|
+|[OpenAI: Assistants & Agents Build Hour](https://vimeo.com/showcase/11333741/video/990334325)|⬜|
+|[OpenAI: Function Calling Build Hour](https://vimeo.com/showcase/11333741/video/952127114)|⬜|
 |[DeepLearning.AI: Functions, Tools and Agents with LangChain](https://www.deeplearning.ai/short-courses/functions-tools-agents-langchain/)|⬜|
-|[DeepLearning.AI: Building Agentic RAG with LlamaIndex](https://www.deeplearning.ai/short-courses/building-agentic-rag-with-llamaindex/)|✅|
-|[DeepLearning.AI: Multi AI Agent Systems with crewAI](https://www.deeplearning.ai/short-courses/multi-ai-agent-systems-with-crewai/)|✅|
-|[DeepLearning.AI: Building Towards Computer Use with Anthropic](https://www.deeplearning.ai/short-courses/building-towards-computer-use-with-anthropic/)|✅|
+|[DeepLearning.AI: Building Agentic RAG with LlamaIndex](https://www.deeplearning.ai/short-courses/building-agentic-rag-with-llamaindex/)|⬜|
+|[DeepLearning.AI: Multi AI Agent Systems with crewAI](https://www.deeplearning.ai/short-courses/multi-ai-agent-systems-with-crewai/)|⬜|
+|[DeepLearning.AI: Building Towards Computer Use with Anthropic](https://www.deeplearning.ai/short-courses/building-towards-computer-use-with-anthropic/)|⬜|
 |[DeepLearning.AI: Practical Multi AI Agents and Advanced Use Cases with crewAI](https://www.deeplearning.ai/short-courses/practical-multi-ai-agents-and-advanced-use-cases-with-crewai/)|⬜|
 |[DeepLearning.AI: LLMs as Operating Systems: Agent Memory](https://www.deeplearning.ai/short-courses/llms-as-operating-systems-agent-memory/)|⬜|
 |[DeepLearning.AI: Serverless Agentic Workflows with Amazon Bedrock](https://www.deeplearning.ai/short-courses/serverless-agentic-workflows-with-amazon-bedrock/)|⬜|
 |[DeepLearning.AI: AI Agentic Design Patterns with AutoGen](https://www.deeplearning.ai/short-courses/ai-agentic-design-patterns-with-autogen/)|⬜|
 |[DeepLearning.AI: AI Agents in LangGraph](https://www.deeplearning.ai/short-courses/ai-agents-in-langgraph/)|⬜|
 |[DeepLearning.AI: Building Your Own Database Agent](https://www.deeplearning.ai/short-courses/building-your-own-database-agent/)|⬜|
-|[DeepLearning.AI: Function-Calling and Data Extraction with LLMs](https://www.deeplearning.ai/short-courses/function-calling-and-data-extraction-with-llms/) `59m`|✅|
+|[DeepLearning.AI: Function-Calling and Data Extraction with LLMs](https://www.deeplearning.ai/short-courses/function-calling-and-data-extraction-with-llms/) `59m`|⬜|
 
 
 #### Prompt Engineering
