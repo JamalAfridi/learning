@@ -8,8 +8,12 @@ the original pixels rather than from anything the browser re-encoded.
 
 from __future__ import annotations
 
+import base64
+import binascii
 import io
 import json
+import os
+import secrets
 import time
 import uuid
 from dataclasses import dataclass, field
@@ -17,8 +21,8 @@ from pathlib import Path
 from threading import Lock
 
 import requests
-from fastapi import Body, FastAPI, File, Form, HTTPException, UploadFile
-from fastapi.responses import FileResponse, Response
+from fastapi import Body, FastAPI, File, Form, HTTPException, Request, UploadFile
+from fastapi.responses import FileResponse, PlainTextResponse, Response
 from fastapi.staticfiles import StaticFiles
 from PIL import Image
 
@@ -30,7 +34,50 @@ PREVIEW_MAX = 1400
 MAX_SESSIONS = 24
 SESSION_TTL_SECONDS = 6 * 60 * 60
 
+# Decoded images are held in memory at full resolution — a 48 MP photo is about
+# 144 MB as RGB, and each edit adds another version. Left unbounded that OOMs a
+# small instance, so both the history depth and the total footprint are capped.
+# Defaults suit a roomy laptop; a 512 MB host wants MEMORY_BUDGET_MB=300 or so.
+MAX_VERSIONS = int(os.environ.get("MAX_VERSIONS", "8"))
+MEMORY_BUDGET_BYTES = int(os.environ.get("MEMORY_BUDGET_MB", "1500")) * 1024 * 1024
+MAX_INPUT_PIXELS = int(os.environ.get("MAX_INPUT_MP", "80")) * 1_000_000
+
 app = FastAPI(title="Selective AI Photo Editor")
+
+
+@app.middleware("http")
+async def require_password(request: Request, call_next):
+    """Gate the whole app behind a password when APP_PASSWORD is set.
+
+    Anywhere this is reachable by more than you — a LAN, a deployed preview —
+    an open page means anyone who finds it can spend your API key. Basic auth
+    is the one scheme Safari and every other browser prompt for natively, with
+    no login page to build or session cookie to get wrong.
+    """
+    expected = os.environ.get("APP_PASSWORD", "").strip()
+    if not expected or request.url.path == "/healthz":
+        return await call_next(request)
+
+    header = request.headers.get("authorization", "")
+    if header.startswith("Basic "):
+        try:
+            _, _, supplied = base64.b64decode(header[6:]).decode().partition(":")
+        except (binascii.Error, UnicodeDecodeError):
+            supplied = ""
+        if secrets.compare_digest(supplied, expected):
+            return await call_next(request)
+
+    return PlainTextResponse(
+        "Password required.",
+        status_code=401,
+        headers={"WWW-Authenticate": 'Basic realm="Photo editor"'},
+    )
+
+
+@app.get("/healthz")
+def healthz() -> dict:
+    """Unauthenticated, so platform health checks don't need the password."""
+    return {"ok": True}
 
 
 @dataclass
@@ -48,18 +95,44 @@ class Session:
     def current(self) -> Image.Image:
         return self.versions[-1]
 
+    @property
+    def bytes_held(self) -> int:
+        return sum(img.width * img.height * 3 for img in self.versions)
+
+    def add_version(self, img: Image.Image) -> None:
+        """Append an edit, discarding the oldest one if the history is full.
+
+        The original is always kept at index 0 — "back to original" has to work
+        no matter how many edits you've stacked up — so the oldest *edit* is
+        what gets dropped.
+        """
+        self.versions.append(img)
+        while len(self.versions) > MAX_VERSIONS:
+            del self.versions[1]
+        self.touched = time.time()
+
 
 _sessions: dict[str, Session] = {}
 _lock = Lock()
 
 
 def _evict() -> None:
+    """Drop stale sessions, then the least-recently-used until we fit."""
     now = time.time()
     for sid in [s for s, sess in _sessions.items() if now - sess.touched > SESSION_TTL_SECONDS]:
         _sessions.pop(sid, None)
-    while len(_sessions) > MAX_SESSIONS:
-        oldest = min(_sessions.values(), key=lambda s: s.touched)
-        _sessions.pop(oldest.id, None)
+
+    by_age = sorted(_sessions.values(), key=lambda s: s.touched)
+    while len(_sessions) > MAX_SESSIONS and by_age:
+        _sessions.pop(by_age.pop(0).id, None)
+
+    held = sum(s.bytes_held for s in _sessions.values())
+    # Never evict the newest session: it's the one being worked on, and dropping
+    # it would fail the very request that triggered this.
+    while held > MEMORY_BUDGET_BYTES and len(by_age) > 1:
+        victim = by_age.pop(0)
+        held -= victim.bytes_held
+        _sessions.pop(victim.id, None)
 
 
 def _get(session_id: str) -> Session:
@@ -107,6 +180,14 @@ async def upload(file: UploadFile = File(...)) -> dict:
         img = load_image(io.BytesIO(raw))
     except Exception as exc:  # noqa: BLE001
         raise HTTPException(400, f"Couldn't read that image: {exc}") from exc
+
+    if img.width * img.height > MAX_INPUT_PIXELS:
+        raise HTTPException(
+            413,
+            f"That photo is {img.width * img.height / 1e6:.0f} MP; this server is "
+            f"configured to accept up to {MAX_INPUT_PIXELS / 1e6:.0f} MP. "
+            "Raise MAX_INPUT_MP if the machine has the memory for it.",
+        )
 
     fmt = (Image.open(io.BytesIO(raw)).format or "PNG").upper()
     session = Session(
@@ -242,8 +323,8 @@ async def edit(
         }
 
     with _lock:
-        session.versions.append(result)
-        session.touched = time.time()
+        session.add_version(result)
+        _evict()
 
     state = _state(session)
     state["edit"] = {**info, "seconds": round(time.time() - started, 1), "prompt": prompt.strip()}

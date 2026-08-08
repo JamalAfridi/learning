@@ -148,3 +148,67 @@ def test_providers_endpoint_lists_backends(client):
     body = client.get("/api/providers").json()
     ids = {p["id"] for p in body["providers"]}
     assert {"gemini", "openai", "stability"} <= ids
+
+
+def test_history_is_capped_but_always_keeps_the_original(client, monkeypatch):
+    monkeypatch.setattr(app_module, "MAX_VERSIONS", 3)
+    state = upload(client)
+    first = Image.open(io.BytesIO(client.get(f"/api/images/{state['id']}/preview?v=0").content))
+
+    for _ in range(5):
+        client.post(
+            f"/api/images/{state['id']}/edit",
+            data={"prompt": "x", "mode": "whole"},
+        )
+
+    session = app_module._sessions[state["id"]]
+    assert len(session.versions) == 3
+    # Version 0 is still the upload, not an edit that scrolled into its place.
+    kept = Image.open(io.BytesIO(client.get(f"/api/images/{state['id']}/preview?v=0").content))
+    assert kept.tobytes() == first.tobytes()
+
+
+def test_oversized_upload_is_refused_with_a_useful_message(client, monkeypatch):
+    monkeypatch.setattr(app_module, "MAX_INPUT_PIXELS", 100_000)
+    res = client.post("/api/images", files={"file": ("big.jpg", photo_bytes((1200, 900)), "image/jpeg")})
+    assert res.status_code == 413
+    assert "MP" in res.json()["detail"]
+
+
+def test_memory_budget_evicts_old_sessions_but_keeps_the_newest(client, monkeypatch):
+    monkeypatch.setattr(app_module, "MEMORY_BUDGET_BYTES", 1200 * 900 * 3 * 2)
+    ids = [upload(client)["id"] for _ in range(4)]
+    assert ids[-1] in app_module._sessions  # the one in use survives
+    assert len(app_module._sessions) <= 2
+
+
+def test_no_password_configured_means_no_gate(client, monkeypatch):
+    monkeypatch.delenv("APP_PASSWORD", raising=False)
+    assert client.get("/").status_code == 200
+
+
+def test_password_gate_blocks_and_admits(client, monkeypatch):
+    monkeypatch.setenv("APP_PASSWORD", "hunter2")
+
+    anonymous = client.get("/")
+    assert anonymous.status_code == 401
+    assert anonymous.headers["www-authenticate"].startswith("Basic")
+
+    assert client.get("/", auth=("any", "wrong")).status_code == 401
+    assert client.get("/", auth=("any", "hunter2")).status_code == 200
+
+    # The gate covers the API too, not just the page.
+    assert client.get("/api/providers").status_code == 401
+    assert client.get("/api/providers", auth=("any", "hunter2")).status_code == 200
+
+
+def test_malformed_auth_header_is_rejected_not_crashed(client, monkeypatch):
+    monkeypatch.setenv("APP_PASSWORD", "hunter2")
+    assert client.get("/", headers={"Authorization": "Basic not-base64!!"}).status_code == 401
+    assert client.get("/", headers={"Authorization": "Bearer hunter2"}).status_code == 401
+
+
+def test_health_check_stays_open_for_platform_probes(client, monkeypatch):
+    monkeypatch.setenv("APP_PASSWORD", "hunter2")
+    res = client.get("/healthz")
+    assert res.status_code == 200 and res.json() == {"ok": True}

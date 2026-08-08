@@ -65,6 +65,16 @@ You need an API key for whichever image model you want to use. Either export it
 before starting, or paste it into the settings panel (it's kept in your
 browser's localStorage, not on the server):
 
+### Configuration
+
+| Variable | Default | Purpose |
+|---|---|---|
+| `APP_PASSWORD` | unset | Requires a password on every route but `/healthz`. Set it whenever the app is reachable by anyone but you. |
+| `MAX_INPUT_MP` | 80 | Largest upload accepted, in megapixels. |
+| `MAX_VERSIONS` | 8 | Undo depth. The original is never dropped. |
+| `MEMORY_BUDGET_MB` | 1500 | Total held across sessions before evicting the least recently used. |
+| `PORT` | 8000 | Port to serve on. |
+
 | Provider | Env var | Notes |
 |---|---|---|
 | Google Gemini ("Nano Banana") | `GEMINI_API_KEY` | Default. Best at "keep everything, change this one thing". |
@@ -97,9 +107,49 @@ Photos from an iPhone's library are handed over as JPEG by Safari, so HEIC
 originals work without converting anything first.
 
 Two caveats: `--lan` means anyone else on that network can open the page and
-spend your API key, so don't do it on café or hotel Wi-Fi. And iOS Safari will
-drop the tab from memory if you switch away for a long time — the server keeps
-your image for 6 hours, so reloading gets you back to where you were.
+spend your API key, so set `APP_PASSWORD` (below) before you do it. And iOS
+Safari will drop the tab from memory if you switch away for a long time — the
+server keeps your image for 6 hours, so reloading gets you back to where you
+were.
+
+## Deploying a private preview
+
+For testing from a phone when you're not at home, deploy it. `render.yaml` at
+the repo root is a Render Blueprint that does this in one pass — from Safari,
+no CLI needed:
+
+1. https://render.com → **New** → **Blueprint** → connect this repo.
+2. It reads `render.yaml`, and asks for the one secret marked `sync: false`:
+   paste your `GEMINI_API_KEY`.
+3. Deploy. You get `https://ai-photo-editor-xxxx.onrender.com`.
+4. In the service's **Environment** tab, copy the generated `APP_PASSWORD`.
+   Opening the URL prompts for a login — any username, that password.
+5. In Safari: Share → **Add to Home Screen**. It opens full-screen like an app.
+
+Every push to the branch in `render.yaml` redeploys automatically, so a change
+made from your phone is testable on your phone a few minutes later.
+
+**Always set `APP_PASSWORD`.** Any deployed URL is reachable by anyone who
+finds it, and an open page means an open API key. The blueprint generates one
+for you; `APP_PASSWORD` is enforced on every route except `/healthz`.
+
+**Free tier notes.** The instance sleeps after 15 minutes idle, so the first
+request takes ~50s to wake. It has 512 MB, and this app holds decoded images in
+memory — hence the caps in `render.yaml`:
+
+| Variable | Free-tier value | What it does |
+|---|---|---|
+| `MAX_INPUT_MP` | 13 | Refuses larger uploads instead of dying. iPhone photos are 12 MP; a 48 MP ProRAW shot is refused. |
+| `MAX_VERSIONS` | 3 | Undo history depth. The original is always kept; the oldest *edit* is dropped. |
+| `MEMORY_BUDGET_MB` | 120 | Total across sessions before the least-recently-used are evicted. |
+
+Measured on a 12 MP photo with those settings, memory peaks at ~340 MB and
+plateaus. At 20 MP it peaked at ~478 MB, which is too close to the limit. On a
+paid instance, raise all three.
+
+Nothing is written to disk, so there's no volume to configure and a redeploy
+loses in-flight images — which is what you want for photos of yourself sitting
+on someone else's server.
 
 ## Using it
 

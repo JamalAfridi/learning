@@ -1,0 +1,40 @@
+# Render Blueprint — deploys ai-photo-editor as a private preview you can open
+# on a phone. Connect this repo as a Blueprint at https://render.com and every
+# push to the branch below redeploys it.
+#
+# Paths are relative to the repository root.
+
+services:
+  - type: web
+    name: ai-photo-editor
+    runtime: docker
+    plan: free
+    region: frankfurt
+    branch: claude/ai-photo-edit-selective-hcs406
+    dockerfilePath: ./ai-photo-editor/Dockerfile
+    dockerContext: ./ai-photo-editor
+    healthCheckPath: /healthz
+    autoDeploy: true
+    envVars:
+      # Render generates this and shows it in the dashboard. Any username works
+      # at the browser prompt; this is the password. Without it the page is open
+      # to anyone who finds the URL, and your API key is theirs to spend.
+      - key: APP_PASSWORD
+        generateValue: true
+
+      # Set this yourself in the dashboard — `sync: false` keeps it out of git.
+      - key: GEMINI_API_KEY
+        sync: false
+
+      # The free instance has 512 MB and this app holds decoded images in
+      # memory. Measured with these caps: an iPhone 12 MP photo plus a full
+      # edit history peaks at ~340 MB and then plateaus. 20 MP peaked at
+      # ~478 MB, which is too close to the limit — so 13 MP it is. A 48 MP
+      # ProRAW shot will be refused; shoot 12 MP, or use a paid instance and
+      # raise these.
+      - key: MAX_INPUT_MP
+        value: "13"
+      - key: MAX_VERSIONS
+        value: "3"
+      - key: MEMORY_BUDGET_MB
+        value: "120"
