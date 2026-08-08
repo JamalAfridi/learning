@@ -75,6 +75,32 @@ browser's localStorage, not on the server):
 export GEMINI_API_KEY=...   # then ./run.sh
 ```
 
+## On a phone
+
+There's no hosted version — it runs on your own machine. To use it from a
+phone, serve it on your local network and open it from the same Wi-Fi:
+
+```bash
+./run.sh --lan
+```
+
+That prints the address to type into the phone (something like
+`http://192.168.1.42:8000`). Both devices need to be on the same network, and
+a VPN on either one will usually break it.
+
+The UI is built for touch: **pinch with two fingers to zoom, one finger draws**.
+Zoom in before selecting — a fingertip covers a lot of a photo shown 390px
+wide, and zooming is what makes a tight selection around something like a shoe
+possible. "Fit" returns to the whole frame.
+
+Photos from an iPhone's library are handed over as JPEG by Safari, so HEIC
+originals work without converting anything first.
+
+Two caveats: `--lan` means anyone else on that network can open the page and
+spend your API key, so don't do it on café or hotel Wi-Fi. And iOS Safari will
+drop the tab from memory if you switch away for a long time — the server keeps
+your image for 6 hours, so reloading gets you back to where you were.
+
 ## Using it
 
 1. Drop a photo in.

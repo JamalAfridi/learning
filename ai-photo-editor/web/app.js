@@ -12,6 +12,8 @@ const el = {
   dropzone: $("dropzone"),
   file: $("file"),
   wrap: $("canvasWrap"),
+  zoomPane: $("zoomPane"),
+  zoomReset: $("zoomReset"),
   photo: $("photo"),
   overlay: $("overlay"),
   busy: $("busy"),
@@ -56,6 +58,9 @@ const state = {
   drawing: false,
   providers: [],
   busy: false,
+  view: { z: 1, x: 0, y: 0 }, // pinch/scroll zoom of the canvas
+  pointers: new Map(),
+  gesture: null,
 };
 
 const ctx = () => el.overlay.getContext("2d");
@@ -190,6 +195,8 @@ function sizeOverlay() {
     state.maskCanvas = mask;
     state.hasPaint = false;
     state.rect = null;
+    state.rectBeforeDraw = null;
+    resetView();
   }
   draw();
 }
@@ -311,12 +318,98 @@ function paintAt(p, erase) {
   if (!erase) state.hasPaint = true;
 }
 
+/* ------------------------------------------------------- zoom and pan */
+
+/* On a phone the photo is a few hundred pixels wide, so a fingertip covers a
+ * big chunk of the frame. Pinch-zoom is what makes a precise selection
+ * possible. Two fingers pan/zoom, one finger draws. Because the transform sits
+ * on a wrapper, getBoundingClientRect() on the canvas already accounts for it
+ * and the drawing maths below needs no changes. */
+
+const MAX_ZOOM = 8;
+
+function applyView() {
+  const { z, x, y } = state.view;
+  el.zoomPane.style.transform = `translate(${x}px, ${y}px) scale(${z})`;
+  el.zoomReset.hidden = z <= 1.01;
+}
+
+function clampView() {
+  const v = state.view;
+  v.z = Math.min(MAX_ZOOM, Math.max(1, v.z));
+  const w = el.wrap.clientWidth;
+  const h = el.wrap.clientHeight;
+  v.x = Math.min(0, Math.max(w - w * v.z, v.x));
+  v.y = Math.min(0, Math.max(h - h * v.z, v.y));
+}
+
+function resetView() {
+  state.view = { z: 1, x: 0, y: 0 };
+  applyView();
+}
+
+/** Zoom about a fixed point (client coords), keeping that point under the finger. */
+function zoomAbout(clientX, clientY, nextZoom, panX = 0, panY = 0) {
+  const box = el.wrap.getBoundingClientRect();
+  const v = state.view;
+  const px = clientX - box.left;
+  const py = clientY - box.top;
+  const localX = (px - v.x) / v.z;
+  const localY = (py - v.y) / v.z;
+
+  v.z = Math.min(MAX_ZOOM, Math.max(1, nextZoom));
+  v.x = px - localX * v.z + panX;
+  v.y = py - localY * v.z + panY;
+  clampView();
+  applyView();
+}
+
+el.zoomReset.addEventListener("click", resetView);
+
+el.wrap.addEventListener(
+  "wheel",
+  (e) => {
+    if (!state.session) return;
+    // Trackpad pinch and ctrl+scroll zoom; a plain scroll still scrolls the page.
+    if (!e.ctrlKey && !e.metaKey) return;
+    e.preventDefault();
+    zoomAbout(e.clientX, e.clientY, state.view.z * Math.exp(-e.deltaY / 240));
+  },
+  { passive: false }
+);
+
+function gestureMetrics() {
+  const [a, b] = [...state.pointers.values()];
+  return {
+    dist: Math.hypot(a.x - b.x, a.y - b.y) || 1,
+    midX: (a.x + b.x) / 2,
+    midY: (a.y + b.y) / 2,
+  };
+}
+
+/* ------------------------------------------------------------- drawing */
+
 el.overlay.addEventListener("pointerdown", (e) => {
-  if (!state.session || state.mode === "whole" || state.busy) return;
+  if (!state.session || state.busy) return;
   el.overlay.setPointerCapture(e.pointerId);
+  state.pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+
+  if (state.pointers.size === 2) {
+    // A second finger means this was a pinch, not a stroke — undo whatever the
+    // first finger started rather than leaving a stray selection behind.
+    if (state.drawing && state.tool === "rect") state.rect = state.rectBeforeDraw || null;
+    state.drawing = false;
+    const m = gestureMetrics();
+    state.gesture = { dist: m.dist, midX: m.midX, midY: m.midY, zoom: state.view.z };
+    draw();
+    return;
+  }
+  if (state.pointers.size > 1 || state.mode === "whole") return;
+
   state.drawing = true;
   const p = eventPoint(e);
   if (state.tool === "rect") {
+    state.rectBeforeDraw = state.rect;
     state.rect = { x0: p.x, y0: p.y, x1: p.x, y1: p.y };
     clearPaint();
   } else {
@@ -327,6 +420,20 @@ el.overlay.addEventListener("pointerdown", (e) => {
 });
 
 el.overlay.addEventListener("pointermove", (e) => {
+  if (state.pointers.has(e.pointerId)) state.pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+
+  if (state.gesture && state.pointers.size >= 2) {
+    const m = gestureMetrics();
+    const g = state.gesture;
+    zoomAbout(m.midX, m.midY, (g.zoom * m.dist) / g.dist, m.midX - g.midX, m.midY - g.midY);
+    // Re-anchor so the pan is incremental rather than accumulating from the start.
+    g.midX = m.midX;
+    g.midY = m.midY;
+    g.dist = m.dist;
+    g.zoom = state.view.z;
+    return;
+  }
+
   if (!state.drawing) return;
   const p = eventPoint(e);
   if (state.tool === "rect") {
@@ -339,7 +446,9 @@ el.overlay.addEventListener("pointermove", (e) => {
 });
 
 ["pointerup", "pointercancel"].forEach((ev) =>
-  el.overlay.addEventListener(ev, () => {
+  el.overlay.addEventListener(ev, (e) => {
+    state.pointers.delete(e.pointerId);
+    if (state.pointers.size < 2) state.gesture = null;
     if (!state.drawing) return;
     state.drawing = false;
     if (state.tool === "erase" && !paintedBounds()) state.hasPaint = false;
@@ -525,6 +634,14 @@ el.download.addEventListener("click", () => {
   a.click();
 });
 
-window.addEventListener("resize", draw);
+window.addEventListener("resize", () => {
+  if (state.session) {
+    clampView();
+    applyView();
+  }
+  draw();
+});
+
+if (navigator.maxTouchPoints > 0) document.body.classList.add("touch");
 
 loadProviders().catch((err) => log(`Couldn't load providers: ${err.message}`, "err"));

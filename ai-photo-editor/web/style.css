@@ -44,6 +44,11 @@ main {
   main { grid-template-columns: minmax(0, 1fr); }
 }
 
+/* Shown only on touchscreens — the class is set from JS feature detection,
+   which is more reliable across mobile browsers than a hover/pointer query. */
+.touch-only { display: none; }
+body.touch .touch-only { display: block; }
+
 /* ---------- stage ---------- */
 
 .stage { min-width: 0; }
@@ -68,9 +73,16 @@ main {
   border-radius: var(--radius);
   overflow: hidden;
   border: 1px solid var(--line);
+  /* The canvas handles its own pan/pinch, so the browser must not also scroll
+     or zoom the page when a finger lands here. */
+  touch-action: none;
 }
 
-#photo { max-width: 100%; height: auto; display: block; }
+/* Everything inside is scaled as one unit; getBoundingClientRect on the canvas
+   reflects the transform, so pointer maths needs no special handling. */
+.zoom-pane { transform-origin: 0 0; will-change: transform; }
+
+#photo { max-width: 100%; height: auto; display: block; user-select: none; -webkit-user-drag: none; }
 
 #overlay {
   position: absolute;
@@ -79,6 +91,21 @@ main {
   height: 100%;
   cursor: crosshair;
   touch-action: none;
+}
+
+.zoom-reset {
+  position: absolute;
+  right: 10px;
+  bottom: 10px;
+  padding: 8px 14px;
+  font: inherit;
+  font-size: 13px;
+  line-height: 1;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: rgba(25, 28, 24, 0.9);
+  color: var(--text);
+  cursor: pointer;
 }
 
 .busy {
@@ -196,3 +223,28 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
 .log li:last-child { border-bottom: 0; }
 .log li.err { color: var(--danger); }
 .log li.ok { color: var(--text); }
+
+/* ---------- phones ---------- */
+
+@media (max-width: 640px) {
+  header { padding: 14px 16px 8px; }
+  h1 { font-size: 17px; }
+  main { padding: 14px 16px 32px; gap: 14px; }
+
+  .dropzone { padding: 44px 16px; }
+
+  /* Keep the photo on screen with the controls, instead of pushing them
+     a full screen-height down. */
+  .canvas-wrap { max-height: 46vh; }
+  #photo { max-height: 46vh; width: auto; }
+
+  /* iOS zooms the whole page when a focused input is under 16px. */
+  textarea, input, select { font-size: 16px; }
+
+  /* Comfortable finger targets. */
+  .segmented button { padding: 11px 8px; }
+  button.primary, button.ghost { padding: 12px; }
+  input[type="range"] { height: 28px; }
+
+  .log { max-height: 140px; }
+}

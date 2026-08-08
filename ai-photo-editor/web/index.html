@@ -2,7 +2,9 @@
 <html lang="en">
   <head>
     <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="theme-color" content="#10120f" />
     <title>Selective AI Photo Editor</title>
     <link
       rel="icon"
@@ -20,17 +22,21 @@
       <section id="stage" class="stage">
         <div id="dropzone" class="dropzone">
           <p><strong>Drop a photo here</strong> or <label class="link" for="file">choose a file</label></p>
-          <p class="hint">JPEG, PNG, WebP, HEIC-converted — any size. Nothing leaves this machine except the crop you edit.</p>
+          <p class="hint">Any size, any format your device can open. Nothing leaves this machine except the crop you edit.</p>
           <input type="file" id="file" accept="image/*" hidden />
         </div>
 
         <div id="canvasWrap" class="canvas-wrap" hidden>
-          <img id="photo" alt="Photo being edited" />
-          <canvas id="overlay"></canvas>
+          <div id="zoomPane" class="zoom-pane">
+            <img id="photo" alt="Photo being edited" />
+            <canvas id="overlay"></canvas>
+          </div>
+          <button id="zoomReset" class="zoom-reset" hidden>Fit</button>
           <div id="busy" class="busy" hidden><span class="spinner"></span><span id="busyText">Working…</span></div>
         </div>
 
         <div id="meta" class="meta" hidden></div>
+        <p class="hint touch-only">Pinch with two fingers to zoom in before selecting — one finger draws.</p>
       </section>
 
       <aside class="panel">
