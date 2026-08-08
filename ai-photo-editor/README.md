@@ -151,6 +151,21 @@ Nothing is written to disk, so there's no volume to configure and a redeploy
 loses in-flight images — which is what you want for photos of yourself sitting
 on someone else's server.
 
+### Why not Vercel
+
+Considered and rejected, for a reason that would apply to any image tool:
+Vercel functions cap request *and response* bodies at 4.5 MB, enforced at the
+infrastructure level. A 12 MP result is 15–30 MB as PNG or 5–9 MB as JPEG, so
+the download endpoint — the entire deliverable — fails with
+`FUNCTION_PAYLOAD_TOO_LARGE`. Functions are also stateless, and this app keeps
+the full-resolution image in memory across upload → edit → undo → download.
+
+Both are solvable: the client uploads and downloads straight to Vercel Blob
+with signed URLs so the bytes never pass through a function. But that is an
+architecture change, it puts your photos in cloud storage rather than in RAM,
+and using the AI SDK for the model call means porting this whole pipeline from
+Pillow to sharp. Revisit only if the tool earns it.
+
 ## Using it
 
 1. Drop a photo in.
