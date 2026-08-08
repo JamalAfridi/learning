@@ -1,0 +1,1 @@
+"""Selective AI photo editor."""

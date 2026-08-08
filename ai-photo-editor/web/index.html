@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Selective AI Photo Editor</title>
+    <link
+      rel="icon"
+      href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%2310120f'/%3E%3Crect x='7' y='7' width='18' height='18' rx='3' fill='none' stroke='%23c6f04a' stroke-width='2.5' stroke-dasharray='5 3'/%3E%3C/svg%3E"
+    />
+    <link rel="stylesheet" href="/static/style.css" />
+  </head>
+  <body>
+    <header>
+      <h1>Selective AI Photo Editor</h1>
+      <p class="sub">Edit one part of a photo with AI. The rest stays untouched, at full resolution.</p>
+    </header>
+
+    <main>
+      <section id="stage" class="stage">
+        <div id="dropzone" class="dropzone">
+          <p><strong>Drop a photo here</strong> or <label class="link" for="file">choose a file</label></p>
+          <p class="hint">JPEG, PNG, WebP, HEIC-converted — any size. Nothing leaves this machine except the crop you edit.</p>
+          <input type="file" id="file" accept="image/*" hidden />
+        </div>
+
+        <div id="canvasWrap" class="canvas-wrap" hidden>
+          <img id="photo" alt="Photo being edited" />
+          <canvas id="overlay"></canvas>
+          <div id="busy" class="busy" hidden><span class="spinner"></span><span id="busyText">Working…</span></div>
+        </div>
+
+        <div id="meta" class="meta" hidden></div>
+      </section>
+
+      <aside class="panel">
+        <div class="block">
+          <div class="row-label">What are you editing?</div>
+          <div class="segmented" id="modeToggle">
+            <button data-mode="region" class="active">Selected area</button>
+            <button data-mode="whole">Whole image</button>
+          </div>
+          <p class="hint" id="modeHint">
+            Only the selected area is sent to the model and pasted back. Faces and detail elsewhere can't change.
+          </p>
+        </div>
+
+        <div class="block" id="toolBlock">
+          <div class="row-label">Selection tool</div>
+          <div class="segmented" id="toolToggle">
+            <button data-tool="rect" class="active">Rectangle</button>
+            <button data-tool="brush">Brush</button>
+            <button data-tool="erase">Erase</button>
+          </div>
+          <label class="slider" id="brushSizeRow" hidden>
+            Brush size <output id="brushSizeOut">48</output>px
+            <input type="range" id="brushSize" min="8" max="200" value="48" />
+          </label>
+          <button class="ghost" id="clearSel">Clear selection</button>
+        </div>
+
+        <div class="block">
+          <label class="row-label" for="prompt">Describe the change</label>
+          <textarea id="prompt" rows="4" placeholder="e.g. replace the shoes with white leather sneakers, same lighting and shadows"></textarea>
+          <button id="generate" class="primary" disabled>Generate</button>
+          <p class="hint">Tip: describe the whole selected area, not just the difference — the model sees the crop, not the sentence before it.</p>
+        </div>
+
+        <details class="block" id="settings">
+          <summary>Model &amp; blending settings</summary>
+
+          <label class="field">Provider
+            <select id="provider"></select>
+          </label>
+          <label class="field">Model
+            <select id="model"></select>
+          </label>
+          <label class="field">API key
+            <input type="password" id="apiKey" placeholder="stored in this browser only" autocomplete="off" />
+          </label>
+          <p class="hint" id="keyHint"></p>
+
+          <label class="slider">Context margin <output id="ctxOut">25</output>%
+            <input type="range" id="contextPct" min="0" max="80" value="25" />
+          </label>
+          <p class="hint">Extra surroundings sent with the crop so the model matches perspective and light.</p>
+
+          <label class="slider">Detail sent <output id="sendOut">1536</output>px
+            <input type="range" id="maxSend" min="512" max="2048" step="128" value="1536" />
+          </label>
+
+          <label class="slider">Edge feather <output id="featherOut">auto</output>
+            <input type="range" id="feather" min="-1" max="64" value="-1" />
+          </label>
+
+          <label class="slider">Colour match <output id="toneOut">100</output>%
+            <input type="range" id="tone" min="0" max="100" value="100" />
+          </label>
+          <p class="hint">Corrects brightness/tint drift in the model's crop using the untouched surroundings.</p>
+        </details>
+
+        <div class="block">
+          <div class="row-label">Result</div>
+          <div class="btn-row">
+            <button id="undo" class="ghost" disabled>Undo</button>
+            <button id="original" class="ghost" disabled>Back to original</button>
+          </div>
+          <label class="field">Download as
+            <select id="dlFormat">
+              <option value="original">Same format as upload</option>
+              <option value="png">PNG (lossless)</option>
+              <option value="jpeg">JPEG (quality 95)</option>
+              <option value="webp">WebP</option>
+            </select>
+          </label>
+          <button id="download" class="primary" disabled>Download full resolution</button>
+        </div>
+
+        <div class="block log-block">
+          <div class="row-label">Activity</div>
+          <ul id="log" class="log"></ul>
+        </div>
+      </aside>
+    </main>
+
+    <script src="/static/app.js"></script>
+  </body>
+</html>
